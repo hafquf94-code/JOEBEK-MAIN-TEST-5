@@ -1,56 +1,53 @@
+#!/usr/bin/env node
+
+import { execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
-import { execSync } from 'child_process';
 
-const zipPath = '/vercel/share/v0-project/Joebek-Auto-mart-pos-mvp-main.zip';
-const projectRoot = '/vercel/share/v0-project';
+// Simply extract in current directory
+console.log('[v0] Current dir:', process.cwd());
+console.log('[v0] Files before:', fs.readdirSync('.').filter(f => !f.startsWith('.')).slice(0, 10));
 
 try {
-  console.log('[v0] Starting extraction of repository...');
+  console.log('[v0] Extracting Joebek-Auto-mart-pos-mvp-main.zip...');
+  execSync('unzip -q Joebek-Auto-mart-pos-mvp-main.zip', { stdio: 'inherit' });
+  console.log('[v0] Extraction complete');
   
-  // Extract the ZIP file
-  execSync(`cd ${projectRoot} && unzip -q Joebek-Auto-mart-pos-mvp-main.zip`, { stdio: 'inherit' });
+  // Find the extracted folder
+  const files = fs.readdirSync('.');
+  const extractedDir = files.find(f => f.startsWith('Joebek') && fs.statSync(f).isDirectory());
   
-  console.log('[v0] ZIP extraction complete');
+  if (!extractedDir) {
+    throw new Error('Could not find extracted directory');
+  }
   
-  // Find the extracted directory
-  const files = fs.readdirSync(projectRoot);
-  const extractedDir = files.find(f => f.includes('Joebek') && fs.statSync(path.join(projectRoot, f)).isDirectory());
+  console.log('[v0] Found:', extractedDir);
   
-  if (extractedDir) {
-    const extractedPath = path.join(projectRoot, extractedDir);
-    console.log(`[v0] Found extracted directory: ${extractedDir}`);
+  // Move files
+  const contents = fs.readdirSync(extractedDir);
+  console.log('[v0] Moving', contents.length, 'items...');
+  
+  for (const item of contents) {
+    const src = path.join(extractedDir, item);
+    const dst = item;
     
-    // Move all contents from extracted directory to project root
-    const contents = fs.readdirSync(extractedPath);
-    for (const item of contents) {
-      const source = path.join(extractedPath, item);
-      const destination = path.join(projectRoot, item);
-      
-      if (fs.existsSync(destination)) {
-        console.log(`[v0] Removing existing ${item}...`);
-        if (fs.statSync(destination).isDirectory()) {
-          execSync(`rm -rf ${destination}`);
-        } else {
-          fs.unlinkSync(destination);
-        }
+    if (fs.existsSync(dst)) {
+      if (fs.statSync(dst).isDirectory()) {
+        fs.rmSync(dst, { recursive: true });
+      } else {
+        fs.unlinkSync(dst);
       }
-      
-      console.log(`[v0] Moving ${item}...`);
-      execSync(`mv ${source} ${destination}`);
     }
     
-    // Remove the now-empty extracted directory
-    execSync(`rm -rf ${extractedPath}`);
-    
-    // Remove the ZIP file
-    fs.unlinkSync(zipPath);
-    
-    console.log('[v0] Repository extraction complete! All files have been extracted to the project root.');
-  } else {
-    console.log('[v0] No extracted directory found');
+    fs.renameSync(src, dst);
   }
-} catch (error) {
-  console.error('[v0] Error during extraction:', error.message);
+  
+  // Cleanup
+  fs.rmSync(extractedDir, { recursive: true });
+  fs.unlinkSync('Joebek-Auto-mart-pos-mvp-main.zip');
+  
+  console.log('[v0] Done! Repository extracted.');
+} catch (e) {
+  console.error('[v0] Error:', e.message);
   process.exit(1);
 }
